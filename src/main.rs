@@ -4,6 +4,7 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut config = Config::parse();
+    let cpu = Arc::new(pagecatch::cpu::CpuLimit::new()?);
     config.prepare()?;
     downloader::dependency_check(&config)?;
     if config.doctor {
@@ -19,6 +20,7 @@ async fn main() -> anyhow::Result<()> {
     if let Some(settings) = store.load_settings()? {
         config = config.with_download_settings(&settings)?;
     }
+    cpu.set(config.cpu_cores)?;
     let listener = tokio::net::TcpListener::bind((config.host.as_str(), config.port)).await?;
     println!(
         "PageCatch started: http://{}:{} · Save location: {}",
@@ -29,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     if config.token.is_none() && config.host != "127.0.0.1" && config.host != "localhost" {
         println!("LAN access is enabled. Set PC_TOKEN to control access.");
     }
-    let queue = Queue::new(Arc::new(config), store);
+    let queue = Queue::new(Arc::new(config), store, cpu);
     queue.start();
     let shutdown_queue = queue.clone();
     axum::serve(listener, api::router(queue))

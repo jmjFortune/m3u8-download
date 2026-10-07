@@ -9,6 +9,7 @@ services:
       PC_TOKEN: "${PC_TOKEN:?请在 .env 中设置访问令牌}"
       PC_WORKERS: "${PC_WORKERS:-2}"
       PC_THREADS: "${PC_THREADS:-4}"
+      PC_CPU_CORES: "${PC_CPU_CORES:-2}"
     volumes:
       - "${PC_DATA_DIR:-./data}:/data"
       - "${PC_DOWNLOAD_DIR:-./downloads}:${PC_OUTPUT:-/downloads}"

@@ -9,6 +9,8 @@ pub struct DownloadSettings {
     pub workers: u16,
     pub threads: u16,
     pub retries: u16,
+    #[serde(default = "crate::cpu::default_cores")]
+    pub cpu_cores: u16,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -31,6 +33,8 @@ pub struct Config {
     pub threads: u16,
     #[arg(long, env = "PC_RETRIES", default_value_t = 3, value_parser = clap::value_parser!(u16).range(1..=10))]
     pub retries: u16,
+    #[arg(long, env = "PC_CPU_CORES", default_value_t = crate::cpu::default_cores(), value_parser = clap::value_parser!(u16).range(1..))]
+    pub cpu_cores: u16,
     #[arg(long, env = "PC_DOWNLOADER", default_value = "N_m3u8DL-RE")]
     pub downloader: String,
     #[arg(long, env = "PC_FFMPEG", default_value = "ffmpeg")]
@@ -58,6 +62,7 @@ impl Config {
             workers: self.workers,
             threads: self.threads,
             retries: self.retries,
+            cpu_cores: self.cpu_cores,
         }
     }
     pub fn with_download_settings(&self, settings: &DownloadSettings) -> anyhow::Result<Self> {
@@ -93,6 +98,7 @@ impl Config {
         config.workers = settings.workers;
         config.threads = settings.threads;
         config.retries = settings.retries;
+        config.cpu_cores = settings.cpu_cores;
         Ok(config)
     }
     pub fn prepare(&mut self) -> anyhow::Result<()> {
@@ -139,4 +145,28 @@ fn executable_path(name: &str) -> anyhow::Result<String> {
             anyhow::anyhow!("Dependency not found: {name}. Use the Docker image with bundled dependencies or set the full path.")
         })?;
     Ok(std::fs::canonicalize(path)?.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_download_settings_keep_existing_values() {
+        let old = r#"{"output":"/downloads","workers":2,"threads":4,"retries":3}"#;
+        let settings: DownloadSettings = serde_json::from_str(old).unwrap();
+        assert_eq!(settings.cpu_cores, crate::cpu::default_cores());
+        assert_eq!(settings.output, PathBuf::from("/downloads"));
+        assert_eq!(
+            (settings.workers, settings.threads, settings.retries),
+            (2, 4, 3)
+        );
+        let mut chosen = settings;
+        chosen.cpu_cores = 1;
+        assert_eq!(
+            serde_json::from_str::<DownloadSettings>(&serde_json::to_string(&chosen).unwrap())
+                .unwrap(),
+            chosen
+        );
+    }
 }

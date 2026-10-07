@@ -105,9 +105,13 @@ function setSettingsTab(tab) {
 function renderInfo() {
   if (!state.info) return;
   const info = state.info;
+  if ($('cpu_cores').options.length !== info.cpu_available) {
+    $('cpu_cores').replaceChildren(...Array.from({ length: info.cpu_available }, (_, i) => new Option((i + 1) + (i ? ' cores' : ' core'), String(i + 1))));
+  }
+  $('cpu-hint').textContent = info.cpu_limit_supported ? 'Shared by all tasks. Applies immediately.' : 'CPU limits require the Linux / Docker deployment.';
   if (!savingDownloads) {
     const dirty = downloadDirty();
-    state.downloadSettings = { output: info.output, workers: info.workers, threads: info.threads, retries: info.retries };
+    state.downloadSettings = { output: info.output, workers: info.workers, threads: info.threads, retries: info.retries, cpu_cores: info.cpu_cores };
     if (!dirty) fillDownloadSettings();
     updateDownloadButtons();
   }
@@ -346,7 +350,7 @@ async function openLog(task) {
 }
 function headerText() { return Object.keys(state.headers).length ? JSON.stringify(state.headers, null, 2) : ''; }
 function downloadDraft() {
-  return { output: $('output').value.trim(), workers: Number($('workers').value), threads: Number($('threads').value), retries: Number($('retries').value) };
+  return { output: $('output').value.trim(), workers: Number($('workers').value), threads: Number($('threads').value), retries: Number($('retries').value), cpu_cores: Number($('cpu_cores').value) };
 }
 function downloadDirty() {
   if (!state.downloadSettings) return false;
@@ -361,21 +365,23 @@ function fillDownloadSettings() {
 function updateDownloadButtons() {
   const disabled = savingDownloads || !state.downloadSettings;
   for (const id of ['output', 'workers', 'threads', 'retries']) $(id).disabled = disabled;
+  $('cpu_cores').disabled = disabled || !state.info?.cpu_limit_supported;
   $('download-form').setAttribute('aria-busy', String(savingDownloads));
   $('save-download').disabled = disabled || !downloadDirty();
   $('reset-download').disabled = disabled || !downloadDirty();
 }
-for (const id of ['output', 'workers', 'threads', 'retries']) $(id).oninput = () => { message('download-feedback', ''); updateDownloadButtons(); };
+for (const id of ['output', 'workers', 'threads', 'retries', 'cpu_cores']) $(id).oninput = () => { message('download-feedback', ''); updateDownloadButtons(); };
 $('reset-download').onclick = () => { fillDownloadSettings(); message('download-feedback', ''); updateDownloadButtons(); $('output').focus(); };
 $('download-form').onsubmit = async event => {
   event.preventDefault();
   if (savingDownloads || !state.downloadSettings) return;
+  const cpuChanged = downloadDraft().cpu_cores !== state.downloadSettings.cpu_cores;
   savingDownloads = true; updateDownloadButtons(); message('download-feedback', 'Saving…');
   try {
     const settings = await jsonApi('/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(downloadDraft()) });
     state.downloadSettings = settings; state.info = { ...state.info, ...settings }; state.epoch++;
     fillDownloadSettings();
-    message('download-feedback', 'Saved. Applies to tasks that start next.');
+    message('download-feedback', cpuChanged ? 'Saved. CPU limit applied; other settings apply to new tasks.' : 'Saved. Other settings apply to new tasks.');
     await refresh();
   } catch (error) { message('download-feedback', error.message, true); }
   finally {

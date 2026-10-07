@@ -15,6 +15,7 @@ use tokio_util::sync::CancellationToken;
 pub struct Queue {
     pub config: Arc<Config>,
     pub store: Arc<Store>,
+    pub cpu: Arc<crate::cpu::CpuLimit>,
     runtime: Mutex<Runtime>,
     settings_write: Mutex<()>,
     stop: CancellationToken,
@@ -24,10 +25,15 @@ struct Runtime {
     active: HashMap<i64, CancellationToken>,
 }
 impl Queue {
-    pub fn new(config: Arc<Config>, store: Arc<Store>) -> Arc<Self> {
+    pub fn new(
+        config: Arc<Config>,
+        store: Arc<Store>,
+        cpu: Arc<crate::cpu::CpuLimit>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             config: config.clone(),
             store,
+            cpu,
             runtime: Mutex::new(Runtime {
                 config,
                 active: HashMap::new(),
@@ -44,11 +50,37 @@ impl Queue {
         let config = self.current_config().with_download_settings(&settings)?;
         let settings = config.download_settings();
         let mut runtime = self.runtime.lock().unwrap();
-        self.store.save_settings(&settings)?;
+        self.cpu.set(settings.cpu_cores)?;
+        if let Err(error) = self.store.save_settings(&settings) {
+            self.cpu.set(runtime.config.cpu_cores)?;
+            return Err(error);
+        }
         runtime.config = Arc::new(config);
         Ok(settings)
     }
     pub fn start(self: &Arc<Self>) {
+        if crate::cpu::supported() {
+            let q = self.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(1));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                let mut last_error = String::new();
+                loop {
+                    tokio::select! { _=q.stop.cancelled()=>break, _=interval.tick()=>{} }
+                    let cpu = q.cpu.clone();
+                    let result = tokio::task::spawn_blocking(move || cpu.reconcile()).await;
+                    let error = match result {
+                        Ok(Ok(())) => String::new(),
+                        Ok(Err(error)) => format!("{error:#}"),
+                        Err(error) => error.to_string(),
+                    };
+                    if !error.is_empty() && error != last_error {
+                        eprintln!("CPU core limit: {error}");
+                    }
+                    last_error = error;
+                }
+            });
+        }
         for _ in 0..8 {
             let q = self.clone();
             tokio::spawn(async move {

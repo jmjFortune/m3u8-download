@@ -115,7 +115,7 @@ async fn list(State(q): State<Arc<Queue>>) -> Result<impl IntoResponse, Error> {
 async fn info(State(q): State<Arc<Queue>>) -> Json<serde_json::Value> {
     let config = q.current_config();
     Json(
-        json!({"version":env!("CARGO_PKG_VERSION"),"output":config.output,"workers":config.workers,"threads":config.threads,"retries":config.retries,"browser":resolver::browser::executable(&config).is_some(),"preview":config.preview_segments}),
+        json!({"version":env!("CARGO_PKG_VERSION"),"output":config.output,"workers":config.workers,"threads":config.threads,"retries":config.retries,"cpu_cores":config.cpu_cores,"cpu_available":q.cpu.available(),"cpu_limit_supported":crate::cpu::supported(),"browser":resolver::browser::executable(&config).is_some(),"preview":config.preview_segments}),
     )
 }
 async fn settings(State(q): State<Arc<Queue>>) -> Json<DownloadSettings> {

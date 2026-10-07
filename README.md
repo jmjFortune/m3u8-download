@@ -108,7 +108,7 @@ PC_OUTPUT=/path/to/videos
 
 1. 选择 **New Task**，粘贴链接，点击 **Add to Queue**。
 2. 在任务列表查看状态；失败或取消的任务可以重试，活动任务可以取消。
-3. 在 **Settings → Downloads** 修改保存位置、并发数、分片线程数和尝试上限。新设置应用于之后开始的任务，运行中的任务保留原参数。
+3. 在 **Settings → Downloads** 修改保存位置、并发数、CPU 核心上限、分片线程数和尝试上限。CPU 核心上限会调整正在运行的进程，其他参数应用于之后开始的任务。
 4. 已结束任务可以选择垃圾桶 **Delete record**。正在排队、运行或取消清理中的任务需要先停止，再删除记录。
 
 需要 Cookie / Referer 的页面，可在 **Settings → Network** 的 **Request headers** 中填写 JSON：
@@ -132,8 +132,11 @@ PC_OUTPUT=/path/to/videos
 | `PC_OUTPUT` | `/downloads` | 容器内保存根目录，必须对应已挂载的位置 |
 | `PC_WORKERS` | `2` | 初始并发任务数，范围 1–8 |
 | `PC_THREADS` | `4` | 初始分片线程数，范围 1–32 |
+| `PC_CPU_CORES` | `2` | 初始 CPU 核心上限，不得超过容器可用的逻辑核心数 |
 
 尝试上限默认是 3 次，包含首次，可在网页中改为 1–10 次。网页保存的下载配置优先于启动配置。
+
+CPU 限制在 Linux / Docker 中通过 CPU affinity 实现：后端、下载引擎、Chromium 和 FFmpeg 的线程共用所选数量的逻辑核心，多个任务不会各自再获得同样数量的核心。默认使用可用核心中的最后两个，网页按容器启动时可用的核心数提供选项。设置保存到 SQLite，重启后恢复；旧版下载配置缺少此字段时使用最多 2 核。服务每秒检查一次进程树，补上并发创建或自行调整亲和性的子进程。它限制可运行的核心数量，不调整 CPU 频率，也不独占这些核心；NAS 的其他服务仍可使用它们。无需挂载 Docker socket 或启用 privileged。原生 Windows / macOS 运行时此选项不可调整，使用 Docker 部署可启用。
 
 ## 在其他机器构建，再导入 NAS
 

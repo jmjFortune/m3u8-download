@@ -1,5 +1,6 @@
 pub mod api;
 pub mod config;
+pub mod cpu;
 pub mod downloader;
 pub mod model;
 pub mod queue;
