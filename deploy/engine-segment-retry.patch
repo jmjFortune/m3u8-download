@@ -1,0 +1,65 @@
+--- a/src/N_m3u8DL-RE/Downloader/SimpleDownloader.cs
++++ b/src/N_m3u8DL-RE/Downloader/SimpleDownloader.cs
+@@ -21,12 +21,50 @@
+         DownloaderConfig = config;
+     }
+ 
++    // PageCatch: retry invalid media responses and AES failures at segment scope.
+     public async Task<DownloadResult?> DownloadSegmentAsync(MediaSegment segment, string savePath, SpeedContainer speedContainer, Dictionary<string, string>? headers = null)
++    {
++        var retries = DownloaderConfig.MyOptions.DownloadRetryCount;
++        for (var attempt = 0; ; attempt++)
++        {
++            try
++            {
++                return await DownloadSegmentOnceAsync(segment, savePath, speedContainer, headers);
++            }
++            catch (Exception ex) when (ex is InvalidDataException or System.Security.Cryptography.CryptographicException)
++            {
++                File.Delete(savePath);
++                if (attempt >= retries)
++                {
++                    Logger.WarnMarkUp($"[[PageCatch]] Segment {segment.Index} failed after {attempt + 1} attempts: {ex.Message.EscapeMarkup()}");
++                    return null;
++                }
++                Logger.WarnMarkUp($"[[PageCatch]] Segment {segment.Index}: {ex.Message.EscapeMarkup()}; retry {attempt + 1}/{retries}");
++                await Task.Delay(1000 * (attempt + 1));
++            }
++        }
++    }
++    private async Task<DownloadResult?> DownloadSegmentOnceAsync(MediaSegment segment, string savePath, SpeedContainer speedContainer, Dictionary<string, string>? headers = null)
+     {
+         var url = segment.Url;
+         var (des, dResult) = await DownClipAsync(url, savePath, speedContainer, segment.StartRange, segment.StopRange, headers, DownloaderConfig.MyOptions.DownloadRetryCount);
++        if (dResult != null && !dResult.Success)
++            throw new InvalidDataException("Incomplete segment response");
+         if (dResult is { Success: true } && dResult.ActualFilePath != des)
+         {
++            // HTTP 200 can contain an error/redirect HTML page instead of media.
++            // Inspect bytes rather than MIME type: some valid streams use incorrect types.
++            using (var file = File.OpenRead(dResult.ActualFilePath))
++            {
++                if (file.Length == 0)
++                    throw new InvalidDataException("Empty segment response");
++                var prefix = new byte[Math.Min(512, file.Length)];
++                file.ReadExactly(prefix);
++                var text = System.Text.Encoding.UTF8.GetString(prefix).TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
++                if (text.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase) ||
++                    text.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
++                    throw new InvalidDataException("Segment returned an HTML page instead of media");
++            }
+             switch (segment.EncryptInfo.Method)
+             {
+                 case EncryptMethod.AES_128:
+--- a/src/N_m3u8DL-RE/CommandLine/CommandInvoker.cs
++++ b/src/N_m3u8DL-RE/CommandLine/CommandInvoker.cs
+@@ -756,7 +756,8 @@
+         {
+             var parseResult = rootCommand.Parse(args, config);
+             var exitCode = await parseResult.InvokeAsync();
+-            Environment.Exit(exitCode);
++            // Preserve a failed download reported by DoWorkAsync.
++            Environment.Exit(exitCode != 0 ? exitCode : Environment.ExitCode);
+         }
+         catch (Exception ex)
+         {
