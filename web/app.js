@@ -105,10 +105,7 @@ function setSettingsTab(tab) {
 function renderInfo() {
   if (!state.info) return;
   const info = state.info;
-  if ($('cpu_cores').options.length !== info.cpu_available) {
-    $('cpu_cores').replaceChildren(...Array.from({ length: info.cpu_available }, (_, i) => new Option((i + 1) + (i ? ' cores' : ' core'), String(i + 1))));
-  }
-  $('cpu-hint').textContent = info.cpu_limit_supported ? 'Shared by all tasks. Applies immediately.' : 'CPU limits require the Linux / Docker deployment.';
+  $('cpu_cores').max = info.cpu_available;
   if (!savingDownloads) {
     const dirty = downloadDirty();
     state.downloadSettings = { output: info.output, workers: info.workers, threads: info.threads, retries: info.retries, cpu_cores: info.cpu_cores };

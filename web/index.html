@@ -38,7 +38,7 @@
         <form id="download-form">
         <div class="setting-row"><label for="output">Save location</label><div><div class="setting-value"><input id="output" required maxlength="4096" placeholder="Absolute path on the server" disabled><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></div><span class="field-hint">Automatically saved in YYYY-MM-DD folders (UTC+8). In Docker, use a mounted path.</span></div></div>
         <div class="setting-row"><label for="workers">Concurrent downloads</label><input class="number-setting" id="workers" type="number" min="1" max="8" step="1" required disabled></div>
-        <div class="setting-row"><label for="cpu_cores">CPU core limit</label><div><select class="cpu-setting" id="cpu_cores" aria-describedby="cpu-hint" required disabled></select><span class="field-hint" id="cpu-hint">Shared by all tasks. Applies immediately.</span></div></div>
+        <div class="setting-row"><label for="cpu_cores">CPU core limit</label><input class="number-setting" id="cpu_cores" type="number" min="1" step="1" required disabled></div>
         <div class="setting-row"><label for="threads">Segment threads</label><input class="number-setting" id="threads" type="number" min="1" max="32" step="1" required disabled></div>
         <div class="setting-row"><label for="retries">Maximum attempts</label><div><input class="number-setting" id="retries" type="number" min="1" max="10" step="1" required disabled><span class="field-hint">Includes the first attempt.</span></div></div>
         <div class="setting-row" id="preview-row" hidden><span>Download mode</span><span class="readonly-value" id="preview">—</span></div>

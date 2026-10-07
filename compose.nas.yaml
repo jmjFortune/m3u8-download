@@ -1,5 +1,6 @@
 services:
   pagecatch:
+    container_name: pagecatch
     image: "${PC_IMAGE:-pagecatch:0.1.0-amd64}"
     pull_policy: never
     ports:
