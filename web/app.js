@@ -16,6 +16,12 @@ const state = { tasks: [], info: null, downloadSettings: null, filter: 'all', to
 const statusNames = { pending: 'Queued', resolving: 'Resolving', downloading: 'Downloading', verifying: 'Verifying', ok: 'Completed', duplicate: 'Duplicate skipped', fail: 'Failed', cancelled: 'Cancelled' };
 const isActive = task => ['pending', 'resolving', 'downloading', 'verifying'].includes(task.status);
 const isDone = task => ['ok', 'duplicate'].includes(task.status);
+function completionTime(timestamp) {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+  // Task timestamps are Unix seconds; show UTC+8 regardless of the browser timezone.
+  const date = new Date((timestamp + 8 * 60 * 60) * 1000);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 16).replace('T', '-') : '';
+}
 let refreshing = false, savingNetwork = false, savingDownloads = false, submitting = false, logVersion = 0, noticeVersion = 0, logTaskId = null;
 let deleteTask = null, deletingRecord = false;
 let readingFile = false, importVersion = 0;
@@ -142,7 +148,15 @@ function renderTasks() {
     const source = node('div', 'task-url', task.url); source.title = task.url;
     content.append(name, source);
     if (task.message && task.message !== statusNames[task.status] && !['ok', 'duplicate'].includes(task.status)) content.append(node('p', 'task-message' + (task.status === 'fail' ? ' error' : ''), task.message));
-    const metadata = node('div', 'task-meta', '#' + task.id + ' · ' + (task.bytes / 1024 / 1024).toFixed(1) + ' MB' + (task.attempt > 1 ? ' · Retries: ' + (task.attempt - 1) : ''));
+    const metadata = node('div', 'task-meta', '#' + task.id + ' · ' + (task.bytes / 1024 / 1024).toFixed(1) + ' MB');
+    const completed = isDone(task) ? completionTime(task.updated) : '';
+    if (completed) {
+      const time = node('time', 'task-completed', completed);
+      time.dateTime = new Date(task.updated * 1000).toISOString();
+      time.title = 'Completed (UTC+8)';
+      metadata.append(document.createTextNode(' · '), time);
+    }
+    if (task.attempt > 1) metadata.append(document.createTextNode(' · Retries: ' + (task.attempt - 1)));
     content.append(metadata);
     if (task.output) {
       const file = node('div', 'task-file'); file.title = task.output;

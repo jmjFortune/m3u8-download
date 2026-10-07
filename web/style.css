@@ -19,4 +19,5 @@ dialog{width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overfl
 .danger{color:#fff;background:var(--red);font-weight:500}.danger:hover{background:#941f16}.task-actions button[data-action=delete]:hover{color:var(--red);background:var(--red-soft)}#delete-name{overflow-wrap:anywhere}
 
 .number-setting{max-width:110px}
+.task-completed{display:inline-block;white-space:nowrap}
 .input-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.input-header .dialog-label{margin:0}.input-header button{font-size:13px;padding:8px 12px}
