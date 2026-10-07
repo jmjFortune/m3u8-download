@@ -34,6 +34,15 @@ pub fn router(q: Arc<Queue>) -> Router {
             }),
         )
         .route(
+            "/import.js",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+                    include_str!("../web/import.js"),
+                )
+            }),
+        )
+        .route(
             "/style.css",
             get(|| async {
                 (

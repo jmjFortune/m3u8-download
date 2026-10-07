@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>PageCatch · Downloads</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="/import.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -65,8 +66,10 @@
 <dialog id="add-dialog" aria-labelledby="add-title">
   <form id="add-form">
     <div class="dialog-header"><h2 id="add-title">New Task</h2><button type="button" class="icon-button" data-close-dialog="add-dialog" aria-label="Close new task" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
-    <label for="urls" class="dialog-label">Video URLs</label><textarea id="urls" rows="6" placeholder="Paste video page URLs, one per line" aria-describedby="url-hint" required autofocus></textarea>
-    <div class="input-meta"><span id="url-hint">Video pages, M3U8 / MPD</span><span id="url-count">0 / 200 URLs</span></div>
+    <div class="input-header"><label for="urls" class="dialog-label">Video URLs</label><button type="button" class="secondary" id="import-file"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg><span>Import File</span></button></div>
+    <input type="file" id="url-file" accept=".txt,.csv,text/plain,text/csv" aria-label="Import URLs from TXT or CSV" hidden>
+    <textarea id="urls" rows="6" placeholder="Paste URLs or chat history" aria-describedby="url-hint url-count" required autofocus spellcheck="false"></textarea>
+    <div class="input-meta"><span id="url-hint">TXT / CSV · Up to 1 MB · Review before adding</span><span id="url-count" aria-live="polite">0 / 200 URLs</span></div>
     <p id="add-feedback" class="form-feedback" role="status" aria-live="polite"></p>
     <div class="dialog-actions"><button type="button" class="secondary" data-close-dialog="add-dialog">Cancel</button><button type="submit" class="primary" id="submit"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Add to Queue</span></button></div>
   </form>

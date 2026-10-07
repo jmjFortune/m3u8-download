@@ -18,6 +18,7 @@ const isActive = task => ['pending', 'resolving', 'downloading', 'verifying'].in
 const isDone = task => ['ok', 'duplicate'].includes(task.status);
 let refreshing = false, savingNetwork = false, savingDownloads = false, submitting = false, logVersion = 0, noticeVersion = 0, logTaskId = null;
 let deleteTask = null, deletingRecord = false;
+let readingFile = false, importVersion = 0;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -246,18 +247,63 @@ function rejectionReason(item) {
   try { new URL(item.url); return item.reason; }
   catch { return 'Invalid URL. Enter a complete HTTP/HTTPS URL.'; }
 }
-function inputLines() { return $('urls').value.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#')); }
+function inputLines() { return PageCatchImport.extract($('urls').value).urls; }
+function updateAddControls() {
+  $('submit').disabled = submitting || readingFile;
+  $('import-file').disabled = submitting || readingFile;
+  $('urls').disabled = submitting || readingFile;
+  $('add-form').setAttribute('aria-busy', String(submitting || readingFile));
+}
 $('urls').oninput = () => { const count = inputLines().length; $('url-count').textContent = count + ' / 200 URLs'; $('url-count').classList.toggle('error', count > 200); };
+$('urls').onpaste = event => {
+  const text = event.clipboardData?.getData('text/plain');
+  if (!text) return;
+  if (new TextEncoder().encode(text).length > PageCatchImport.maxFileBytes) {
+    event.preventDefault(); message('add-feedback', 'Text is too large. Paste up to 1 MB at a time.', true); return;
+  }
+  const result = PageCatchImport.extract(text);
+  if (!result.urls.length) return;
+  event.preventDefault();
+  const input = $('urls');
+  const combined = PageCatchImport.extract(input.value.slice(0, input.selectionStart) + '\n' + text + '\n' + input.value.slice(input.selectionEnd));
+  input.value = combined.urls.join('\n'); input.oninput();
+  input.setSelectionRange(input.value.length, input.value.length);
+  message('add-feedback', 'Links extracted. Review before adding.' + (combined.duplicates ? ' Duplicates skipped: ' + combined.duplicates + '.' : ''));
+};
+$('import-file').onclick = () => { $('url-file').value = ''; $('url-file').click(); };
+$('url-file').onchange = async () => {
+  const file = $('url-file').files[0];
+  if (!file || submitting || readingFile) return;
+  const version = ++importVersion;
+  readingFile = true; updateAddControls();
+  message('add-feedback', 'Reading file…');
+  try {
+    const result = await PageCatchImport.readFile(file);
+    if (version !== importVersion || !$('add-dialog').open) return;
+    const merged = PageCatchImport.extract([...inputLines(), ...result.urls].join('\n'));
+    $('urls').value = merged.urls.join('\n'); $('urls').oninput();
+    const duplicates = result.duplicates + merged.duplicates;
+    message('add-feedback', file.name + ': ' + result.urls.length + ' URLs found.' + (duplicates ? ' Duplicates skipped: ' + duplicates + '.' : '') + ' Review before adding.');
+    if (merged.urls.length > 200) message('add-feedback', 'Found ' + merged.urls.length + ' unique URLs. Keep up to 200 for this batch; no links were dropped.', true);
+  } catch (error) {
+    if (version === importVersion && $('add-dialog').open) message('add-feedback', error.message, true);
+  } finally {
+    if (version === importVersion) { readingFile = false; updateAddControls(); $('url-file').value = ''; }
+  }
+};
+$('add-dialog').onclose = () => { importVersion++; readingFile = false; $('url-file').value = ''; updateAddControls(); };
 $('urls').onkeydown = event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); $('add-form').requestSubmit(); } };
 $('add-form').onsubmit = async event => {
   event.preventDefault();
-  if (submitting) return;
+  if (submitting || readingFile) return;
   const lines = inputLines();
-  if (!lines.length || lines.length > 200) { message('add-feedback', 'Enter 1–200 URLs, one per line.', true); return; }
-  submitting = true; $('submit').disabled = true;
+  if (!lines.length || lines.length > 200) { message('add-feedback', 'Enter 1–200 valid HTTP/HTTPS URLs. You can paste chat history or import TXT / CSV.', true); return; }
+  const body = JSON.stringify({ urls: lines.join('\n'), headers: state.headers });
+  if (new TextEncoder().encode(body).length > 128 * 1024) { message('add-feedback', 'This batch exceeds the server request size. Submit fewer or shorter URLs.', true); return; }
+  submitting = true; updateAddControls();
   message('add-feedback', 'Adding to queue…');
   try {
-    const result = await jsonApi('/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ urls: lines.join('\n'), headers: state.headers }) });
+    const result = await jsonApi('/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
     const summary = 'Added ' + result.added.length + (result.added.length === 1 ? ' task' : ' tasks') + (result.skipped.length ? ', duplicates skipped: ' + result.skipped.length : '');
     if (result.rejected.length) {
       $('urls').value = result.rejected.map(item => item.url).join('\n'); $('urls').oninput();
@@ -269,7 +315,7 @@ $('add-form').onsubmit = async event => {
     await refresh();
   } catch (error) { message('add-feedback', error.message, true); }
   finally {
-    submitting = false; $('submit').disabled = false;
+    submitting = false; updateAddControls();
     if ($('add-dialog').open && document.activeElement === document.body) $('urls').focus();
   }
 };
