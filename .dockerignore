@@ -1,0 +1,13 @@
+.git
+target
+local
+data
+downloads
+phone_videos
+bin
+.env
+**/*.mp4
+dist
+desktop-app
+node_modules
+.next

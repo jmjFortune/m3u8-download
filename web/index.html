@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PageCatch · Downloads</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<svg class="icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 16v4h14v-4"/></symbol><symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l3-3a4 4 0 0 1 6 0m0 2 1-1a4 4 0 0 1 6 6l-3 3a4 4 0 0 1-6 0"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h6l2 2h10v13H3Z"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></symbol><symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6"/></symbol><symbol id="i-log" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6Zm3 6h6m-6 4h6m-6 4h4"/></symbol><symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol><symbol id="i-retry" viewBox="0 0 24 24"><path d="M4 4v6h6M4 10a8 8 0 1 1 1 8"/></symbol><symbol id="i-workers" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></symbol><symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a19 19 0 0 1 0 18 19 19 0 0 1 0-18"/></symbol><symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="i-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7M3 12h18"/></symbol><symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol><symbol id="i-video" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6Z"/><path d="m10 9 5 3-5 3Z"/></symbol><symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></symbol><symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol></defs></svg>
+<div class="app-shell" id="app-shell">
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="brand-row">
+      <a class="brand" id="brand" href="/" aria-label="PageCatch home"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>PageCatch</span></a>
+      <button type="button" class="icon-button collapse-button" id="collapse-nav" aria-label="Collapse sidebar" aria-expanded="true" title="Collapse sidebar"><svg class="icon" aria-hidden="true"><use href="#i-panel"/></svg></button>
+    </div>
+    <nav class="nav-menu">
+      <button type="button" class="nav-button" id="nav-downloads" aria-current="page" aria-label="Downloads" title="Downloads"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span class="nav-label">Downloads</span><span class="nav-count" id="nav-count" aria-hidden="true">0</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <nav class="nav-menu"><button type="button" class="nav-button" id="nav-settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="nav-label">Settings</span></button></nav>
+      <span class="sidebar-version" id="sidebar-version">PageCatch</span>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="notice" id="notice" role="status" hidden><span id="notice-text"></span><button type="button" id="notice-settings" hidden>Access settings</button><button type="button" class="icon-button" id="dismiss-notice" aria-label="Dismiss notification" title="Dismiss notification"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <section id="downloads-view" aria-labelledby="downloads-title">
+      <header class="page-header"><h1 id="downloads-title">Downloads</h1><div class="header-actions"><span class="connection" id="connection" role="status">Connecting</span><button type="button" class="primary" id="new-task"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>New Task</span></button></div></header>
+      <div class="task-toolbar"><div class="tabs" role="group" aria-label="Filter tasks"><button type="button" data-filter="all" aria-pressed="true">All <span class="tab-count" id="count-all">0</span></button><button type="button" data-filter="active" aria-pressed="false">Active <span class="tab-count" id="count-active" hidden>0</span></button><button type="button" data-filter="done" aria-pressed="false">Completed <span class="tab-count" id="count-done" hidden>0</span></button><button type="button" data-filter="fail" aria-pressed="false">Failed <span class="tab-count" id="count-fail" hidden>0</span></button></div><button type="button" class="icon-button" id="refresh" aria-label="Refresh tasks" title="Refresh"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+      <div id="task-list" aria-live="off"><div class="empty"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><p>Loading tasks…</p></div></div>
+    </section>
+    <section id="settings-view" aria-labelledby="settings-title" hidden>
+      <header class="page-header"><h1 id="settings-title">Settings</h1><button type="button" class="icon-button" id="back-downloads" aria-label="Back to downloads" title="Back to downloads"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button></header>
+      <div class="tabs settings-tabs" role="tablist" aria-label="Settings categories"><button type="button" id="tab-download" role="tab" data-setting="download" aria-controls="panel-download" aria-selected="true">Downloads</button><button type="button" id="tab-network" role="tab" data-setting="network" aria-controls="panel-network" aria-selected="false" tabindex="-1">Network</button><button type="button" id="tab-about" role="tab" data-setting="about" aria-controls="panel-about" aria-selected="false" tabindex="-1">About</button></div>
+      <section class="settings-panel" id="panel-download" role="tabpanel" aria-labelledby="tab-download">
+        <form id="download-form">
+        <div class="setting-row"><label for="output">Save location</label><div><div class="setting-value"><input id="output" required maxlength="4096" placeholder="Absolute path on the server" disabled><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></div><span class="field-hint">Automatically saved in YYYY-MM-DD folders (UTC+8). In Docker, use a mounted path.</span></div></div>
+        <div class="setting-row"><label for="workers">Concurrent downloads</label><input class="number-setting" id="workers" type="number" min="1" max="8" step="1" required disabled></div>
+        <div class="setting-row"><label for="threads">Segment threads</label><input class="number-setting" id="threads" type="number" min="1" max="32" step="1" required disabled></div>
+        <div class="setting-row"><label for="retries">Maximum attempts</label><div><input class="number-setting" id="retries" type="number" min="1" max="10" step="1" required disabled><span class="field-hint">Includes the first attempt.</span></div></div>
+        <div class="setting-row" id="preview-row" hidden><span>Download mode</span><span class="readonly-value" id="preview">—</span></div>
+        <p class="panel-hint">Saved on the server. Running tasks keep their current settings.</p>
+        <div class="settings-actions"><p id="download-feedback" role="status" aria-live="polite"></p><button type="button" class="secondary" id="reset-download" disabled>Discard Changes</button><button type="submit" class="primary" id="save-download" disabled>Save Changes</button></div>
+        </form>
+      </section>
+      <section class="settings-panel" id="panel-network" role="tabpanel" aria-labelledby="tab-network" hidden>
+        <form id="network-form">
+          <div class="setting-row"><label for="token">Access token</label><input id="token" type="password" autocomplete="off" placeholder="Enter the token configured on the server"></div>
+          <div class="setting-row align-top"><label for="headers">Request headers<span class="field-hint">Cookie / Referer</span></label><textarea id="headers" rows="5" placeholder='{"Cookie":"…", "Referer":"https://example.com/"}' spellcheck="false"></textarea></div>
+          <p class="panel-hint">Token remembered in this browser. Headers kept for this tab only.</p>
+          <div class="settings-actions"><p id="network-feedback" role="status" aria-live="polite"></p><button type="button" class="secondary" id="reset-network" disabled>Discard Changes</button><button type="submit" class="primary" id="save-network" disabled>Save Changes</button></div>
+        </form>
+      </section>
+      <section class="settings-panel" id="panel-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+        <div class="setting-row"><span>Version</span><span class="readonly-value" id="version">—</span></div>
+        <div class="setting-row"><span>Server address</span><span class="readonly-value" id="service-address">—</span></div>
+        <div class="setting-row"><span>Download engine</span><span class="readonly-value">N_m3u8DL-RE</span></div>
+        <div class="setting-row"><span>Video processing</span><span class="readonly-value">FFmpeg</span></div>
+        <div class="setting-row"><span>Browser parsing</span><span class="readonly-value" id="browser">—</span></div>
+      </section>
+    </section>
+  </main>
+</div>
+<dialog id="add-dialog" aria-labelledby="add-title">
+  <form id="add-form">
+    <div class="dialog-header"><h2 id="add-title">New Task</h2><button type="button" class="icon-button" data-close-dialog="add-dialog" aria-label="Close new task" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <label for="urls" class="dialog-label">Video URLs</label><textarea id="urls" rows="6" placeholder="Paste video page URLs, one per line" aria-describedby="url-hint" required autofocus></textarea>
+    <div class="input-meta"><span id="url-hint">Video pages, M3U8 / MPD</span><span id="url-count">0 / 200 URLs</span></div>
+    <p id="add-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close-dialog="add-dialog">Cancel</button><button type="submit" class="primary" id="submit"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Add to Queue</span></button></div>
+  </form>
+</dialog>
+<dialog id="log-dialog" class="log-dialog" aria-labelledby="log-title"><div class="dialog-header"><h2 id="log-title">Task Logs</h2><button type="button" class="icon-button" data-close-dialog="log-dialog" aria-label="Close logs" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div><pre id="log-content">Loading logs…</pre></dialog>
+<dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+  <form id="delete-form">
+    <div class="dialog-header"><h2 id="delete-title">Delete record?</h2></div>
+    <p class="dialog-label" id="delete-name"></p>
+    <p id="delete-description">Remove this task from the list? Video files will be kept.</p>
+    <p id="delete-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+    <div class="dialog-actions"><button type="button" class="secondary" id="cancel-delete">Cancel</button><button type="submit" class="danger" id="confirm-delete">Delete Record</button></div>
+  </form>
+</dialog>
+</body>
+</html>

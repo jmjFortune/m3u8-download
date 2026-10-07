@@ -1,0 +1,19 @@
+services:
+  pagecatch:
+    image: "${PC_IMAGE:-pagecatch:0.1.0-amd64}"
+    pull_policy: never
+    ports:
+      - "${PC_PORT:-8787}:8787"
+    environment:
+      PC_OUTPUT: "${PC_OUTPUT:-/downloads}"
+      PC_TOKEN: "${PC_TOKEN:?请在 .env 中设置访问令牌}"
+      PC_WORKERS: "${PC_WORKERS:-2}"
+      PC_THREADS: "${PC_THREADS:-4}"
+    volumes:
+      - "${PC_DATA_DIR:-./data}:/data"
+      - "${PC_DOWNLOAD_DIR:-./downloads}:${PC_OUTPUT:-/downloads}"
+    shm_size: 256mb
+    restart: unless-stopped
+    stop_grace_period: 20s
+    # 如指定 user，请确保两个挂载目录可写。
+    # user: "1000:1000"
