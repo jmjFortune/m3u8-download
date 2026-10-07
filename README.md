@@ -1,116 +1,156 @@
 # PageCatch
 
-输入普通视频播放页链接，自动解析 HLS / DASH，下载并校验 MP4。Rust 后端与英文网页一起打包，使用 Docker 部署到飞牛 NAS。
+PageCatch 是一个带网页界面的视频下载服务，使用 Rust 编写，通过 Docker 部署。
 
-## NAS 部署
+输入视频播放页链接后，程序尝试提取 HLS / DASH 播放清单；静态解析没有找到有效清单时，会启动 Chromium 捕获媒体请求。下载由 N_m3u8DL-RE 执行，FFmpeg 和 ffprobe 负责合并后的文件检查。
 
-当前 NAS 项目位于 `/vol1/1000/docker/pagecatch`，访问地址为 `http://192.168.193.2:8787`。
+本仓库提供源码和 Docker 构建配置。当前 GitHub Actions 只构建镜像，不发布镜像或可下载安装包。
 
-`dist/` 保留两种 NAS 镜像：x86_64 使用 `pagecatch-docker-amd64.tar.gz`，ARM64 使用 `pagecatch-docker-arm64.tar.gz`。将对应镜像包、`compose.nas.yaml` 和 `.env.example` 放入 NAS 项目目录。
+## 已实现的功能
 
-首次部署：
+- 提交播放页或 HLS / DASH 清单链接，一行一个；每次最多提交 200 条。清单地址不必以 `.m3u8` 或 `.mpd` 结尾，程序会检查响应内容。
+- 下载队列、并发控制、失败重试、取消任务和查看日志。
+- 下载后检查视频轨道、时长，并执行 FFmpeg 解码检查；检查通过后保存 MP4。
+- 按 UTC+8 日期保存到 `YYYY-MM-DD` 子目录，目录不存在时创建。日期在校验完成、开始保存时计算。
+- SQLite 保存任务和下载配置；服务重启后，未结束任务重新进入队列。
+- 相同链接检查，以及基于时长和开头 6 秒帧指纹的已有视频检查。
+- 删除已结束任务的记录，保留视频文件和日志。
+
+## 从源码部署
+
+需要 Git、支持 BuildKit 的 Docker，以及 Docker Compose。构建时需要联网获取基础镜像、系统软件包和下载引擎。
 
 ```bash
-docker load -i pagecatch-docker-amd64.tar.gz
+git clone https://github.com/jmjFortune/m3u8-download.git
+cd m3u8-download
 cp .env.example .env
-# 编辑 .env：设置 PC_TOKEN、数据目录和视频目录
-# ARM64 还需设置 PC_IMAGE=pagecatch:0.1.0-arm64
-docker compose -f compose.nas.yaml up -d
 ```
 
-已有部署升级时保留原 `.env` 和数据目录，导入新镜像后再重建容器：
-
-```bash
-docker load -i pagecatch-docker-amd64.tar.gz
-docker compose -f compose.nas.yaml up -d --force-recreate
-```
-
-`.env` 的目录配置示例：
-
-```dotenv
-PC_IMAGE=pagecatch:0.1.0-amd64
-PC_TOKEN=自行填写访问令牌
-PC_PORT=8787
-PC_WORKERS=2
-PC_THREADS=4
-PC_DATA_DIR=/vol1/1000/docker/pagecatch/data
-PC_DOWNLOAD_DIR=/vol4/1000/ZiLiao/资料/Resources/xxzl/BUFFER/Videos
-PC_OUTPUT=/vol4/1000/ZiLiao/资料/Resources/xxzl/BUFFER/Videos
-```
-
-提前创建这些目录。`PC_DOWNLOAD_DIR` 和 `PC_OUTPUT` 使用同一绝对路径，网页显示与 NAS 实际位置一致。已经在网页保存过配置时，网页设置优先于环境变量；需要在 **Settings → Downloads** 同步目录。成品在校验完成后保存到北京时间当天的 `YYYY-MM-DD` 子目录，不存在时自动创建。
-
-```bash
-docker compose -f compose.nas.yaml ps
-docker compose -f compose.nas.yaml logs -f
-docker compose -f compose.nas.yaml down
-```
-
-停止或重建容器不会清空挂载的数据目录和视频目录。镜像包含下载引擎、FFmpeg、ffprobe 与 Chromium，无需在 NAS 单独安装依赖。
-
-## 使用
-
-打开 NAS 网页，在左下角 **Settings → Network** 保存 `.env` 中的访问令牌。成功验证后令牌保存在当前浏览器，刷新仍保持连接；换浏览器、地址或端口后需要重新输入。Cookie / Referer 只保留在当前页面。
-
-**New Task** 中粘贴网页或媒体链接，一行一个，然后选择 **Add to Queue**。页面会自动解析媒体地址；需要登录的页面可填写请求头。验证码、DRM、特殊播放操作及直播录制不在自动处理范围内。
-
-任务支持取消、重试和查看日志。已结束任务的垃圾桶 **Delete record** 只删除记录，保留视频和调试日志。活动任务先取消，等待清理完成后才能删除。
-
-下载配置在 **Settings → Downloads** 保存到 SQLite，重启后恢复。运行中的任务继续使用原参数，之后启动的任务使用新配置。
-
-## 从源码构建 Docker 镜像
-
-在项目根目录执行：
-
-```bash
-docker build -f deploy/Dockerfile -t pagecatch:0.1.0-amd64 .
-```
-
-此命令构建当前机器架构的镜像，适用于 x86_64 NAS。跨架构构建使用 Docker Buildx：
-
-```bash
-docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t pagecatch:0.1.0-amd64 --load .
-# ARM64 将 amd64 改为 arm64
-```
-
-使用 `compose.yaml` 可以直接从源码构建并启动：
+编辑 `.env`，将 `PC_TOKEN` 改为自己的访问令牌，然后启动：
 
 ```bash
 docker compose up -d --build
 ```
 
-## 项目结构
+在浏览器打开 `http://你的NAS地址:8787`。进入左下角 **Settings → Network**，输入与 `.env` 中 `PC_TOKEN` 相同的值并选择 **Save Changes**。这里填写的是服务器已配置的令牌；修改服务器令牌需要编辑 `.env` 并重建容器。
 
-```text
-src/              Rust 后端：解析、队列、下载、校验、SQLite 和 API
-web/              NAS 网页，编译时内嵌进后端，必须保留
-Cargo.toml        Rust 依赖配置
-Cargo.lock        锁定依赖版本
-compose.nas.yaml  使用预构建镜像部署 NAS
-compose.yaml      从源码构建并运行
-.env.example      部署环境变量模板
-deploy/Dockerfile Docker 镜像构建文件
-dist/            NAS Docker 镜像及 SHA256 校验清单
-third-party/      第三方组件许可通知
-local/nas-deploy/  当前 NAS 私有配置、部署辅助工具及验收记录，不上传
-.github/          Docker 构建工作流
+Docker 镜像内安装了 N_m3u8DL-RE、FFmpeg、ffprobe 和 Chromium。Dockerfile 包含 `linux/amd64` 和 `linux/arm64` 的构建配置，普通 Compose 构建使用当前主机的架构。
+
+查看运行状态和日志：
+
+```bash
+docker compose ps
+docker compose logs -f
 ```
 
-电脑端脚本、安装包、旧版工具、本地构建缓存、独立集成测试目录和非 NAS 测试产物已移除。源码内的单元测试仍可用于后续调试；重新在本机编译时会自动生成 `target/`。
+更新源码后重新构建：
 
-## 接口和配置
+```bash
+git pull
+docker compose up -d --build
+```
 
-认证接口使用 `Authorization: Bearer <令牌>`。`/healthz` 为健康检查。
+停止服务：
 
-- `POST /api/tasks`：提交 `{"urls":"网页链接\n网页链接","headers":{}}`。
-- `GET /api/tasks`：任务列表。
-- `POST /api/tasks/{id}/cancel`、`/retry`：取消或重试。
-- `DELETE /api/tasks/{id}`：删除终态记录，保留视频；活动或取消清理中的任务返回 400，未知记录返回 404。
-- `GET /api/tasks/{id}/log`：日志。
-- `GET /api/settings`、`PUT /api/settings`：读取和保存下载配置。
+```bash
+docker compose down
+```
 
-可保存配置为绝对输出路径、并发数（1–8）、分片线程数（1–32）和尝试上限（1–10，包含首次）。环境变量还支持 `PC_RETRIES`（默认 3）、`PC_TIMEOUT`（默认 21600 秒）、`PC_DOWNLOADER`、`PC_FFMPEG`、`PC_FFPROBE`、`PC_BROWSER`；Docker 已配置这些工具。
+## 数据和保存目录
+
+默认挂载关系如下，主机路径相对于项目目录：
+
+| 主机目录 | 容器目录 | 内容 |
+|---|---|---|
+| `./data` | `/data` | `tasks.sqlite`、任务日志、下载临时文件 |
+| `./downloads` | `/downloads` | 校验通过的视频及日期子目录 |
+
+成品可以通过 NAS 文件管理器访问。停止或重建容器会保留上述主机目录。
+
+要指定 NAS 上已有的绝对目录，在 `.env` 中设置 `PC_DATA_DIR` 和 `PC_DOWNLOAD_DIR`。如果希望网页显示的保存位置与 NAS 实际路径相同，将 `PC_DOWNLOAD_DIR` 和 `PC_OUTPUT` 设为同一绝对路径。例如，下面的占位路径需替换为自己的目录：
+
+```dotenv
+PC_DATA_DIR=/path/to/pagecatch/data
+PC_DOWNLOAD_DIR=/path/to/videos
+PC_OUTPUT=/path/to/videos
+```
+
+创建相应目录并保证容器可写，然后重建容器。网页 **Settings → Downloads** 中保存过的设置优先于环境变量；已有部署还需在网页中同步保存位置。修改保存目录不会搬移已有视频。
+
+## 网页使用
+
+1. 选择 **New Task**，粘贴链接，点击 **Add to Queue**。
+2. 在任务列表查看状态；失败或取消的任务可以重试，活动任务可以取消。
+3. 在 **Settings → Downloads** 修改保存位置、并发数、分片线程数和尝试上限。新设置应用于之后开始的任务，运行中的任务保留原参数。
+4. 已结束任务可以选择垃圾桶 **Delete record**。正在排队、运行或取消清理中的任务需要先停止，再删除记录。
+
+需要 Cookie / Referer 的页面，可在 **Settings → Network** 的 **Request headers** 中填写 JSON：
+
+```json
+{"Cookie":"填写自己的 Cookie","Referer":"https://example.com/"}
+```
+
+请求头用于新提交的任务，并随任务存入 SQLite；网页中的默认请求头不会在刷新后恢复。访问令牌验证成功后保存在当前浏览器的 localStorage，浏览器允许站点存储时可以在刷新后恢复；更换浏览器、地址或端口需要重新填写。
+
+## Compose 配置
+
+以下变量由仓库内的 Compose 文件使用：
+
+| 变量 | 默认值 | 用途 |
+|---|---|---|
+| `PC_TOKEN` | 必须填写 | API 访问令牌 |
+| `PC_PORT` | `8787` | 主机网页端口 |
+| `PC_DATA_DIR` | `./data` | 主机数据目录 |
+| `PC_DOWNLOAD_DIR` | `./downloads` | 主机视频目录 |
+| `PC_OUTPUT` | `/downloads` | 容器内保存根目录，必须对应已挂载的位置 |
+| `PC_WORKERS` | `2` | 初始并发任务数，范围 1–8 |
+| `PC_THREADS` | `4` | 初始分片线程数，范围 1–32 |
+
+尝试上限默认是 3 次，包含首次，可在网页中改为 1–10 次。网页保存的下载配置优先于启动配置。
+
+## 在其他机器构建，再导入 NAS
+
+`compose.nas.yaml` 仅启动已有镜像，不执行构建，也不从镜像仓库拉取。使用它之前，需要自行构建或导入镜像，并用 `PC_IMAGE` 指定镜像名。
+
+例如，在支持 Docker Buildx 的机器上为 x86_64 NAS 构建并导出：
+
+```bash
+docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t pagecatch:nas --load .
+docker save pagecatch:nas | gzip > pagecatch-nas.tar.gz
+```
+
+ARM64 NAS 将构建平台改为 `linux/arm64`。把镜像归档、`compose.nas.yaml` 和配置好的 `.env` 传到 NAS；在 `.env` 中设置 `PC_IMAGE=pagecatch:nas`，然后执行：
+
+```bash
+docker load -i pagecatch-nas.tar.gz
+docker compose -f compose.nas.yaml up -d
+```
+
+此部署方式的状态和日志命令也需加上 `-f compose.nas.yaml`。
+
+## 当前范围
+
+页面解析受网站结构、请求头、登录状态和网络限制影响，不能保证任意网站都能解析。Chromium 使用独立临时配置，不使用访问网页的浏览器登录会话。
+
+当前不提供交互式登录、验证码处理、DRM 解密或直播录制。已有视频检查只比较开头 6 秒的帧指纹，不是完整视频内容比较。
+
+## 源码结构
+
+```text
+src/                Rust 后端：解析、任务队列、下载、校验、SQLite、API
+web/                HTML / CSS / JavaScript，编译时内嵌到后端
+Cargo.toml          Rust 依赖配置
+Cargo.lock          锁定依赖版本
+deploy/Dockerfile   Docker 多阶段构建
+compose.yaml        从源码构建并运行
+compose.nas.yaml    使用已有镜像运行
+.env.example        Compose 配置模板
+third-party/        第三方组件许可证和来源说明
+.github/workflows/  Docker 构建工作流
+```
+
+源码内的单元测试可以通过 `cargo test --lib --locked` 运行，需要本机安装 Rust。网页不需要单独执行 Node.js 或前端打包命令。
 
 ## 许可
 
-主项目 MIT。下载引擎来自 N_m3u8DL-RE，媒体处理使用 FFmpeg，动态解析使用 Chromium。第三方许可和来源保留在 `third-party/`，构建镜像时一并复制。
+项目采用 [MIT License](LICENSE)。第三方组件的许可和来源见 [third-party](third-party/README.md)。
