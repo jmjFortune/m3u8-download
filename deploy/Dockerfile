@@ -9,6 +9,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY web ./web
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/build/target \
+    set -e; cargo test --lib --locked; \
     target=$(cat /build-target); linker=$(cat /build-linker); \
     key=$(printf '%s' "$target" | tr '[:lower:]-' '[:upper:]_'); \
     env "CARGO_TARGET_${key}_LINKER=$linker" "CC=$linker" cargo build --release --locked --target "$target" && cp "target/$target/release/pagecatch" /build/pagecatch

@@ -186,12 +186,13 @@ async fn resolve_inner(
         .timeout(Duration::from_secs(12))
         .user_agent(UA)
         .build()?;
-    let mut pending = VecDeque::from([(initial.clone(), 0)]);
+    let mut pending = VecDeque::from([(initial.clone(), 0, true)]);
     let mut seen = HashSet::new();
     let mut errors = Vec::new();
     let mut page_ref = raw.to_owned();
+    let mut browser_page = raw.to_owned();
     let static_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-    'static_pages: while let Some((u, depth)) = pending.pop_front() {
+    'static_pages: while let Some((u, depth, is_page)) = pending.pop_front() {
         if tokio::time::Instant::now() >= static_deadline {
             break;
         }
@@ -211,8 +212,11 @@ async fn resolve_inner(
             }
         };
         let final_url = response.url().clone();
-        if depth == 0 {
+        if is_page {
             page_ref = final_url.to_string();
+            if depth > 0 {
+                browser_page = page_ref.clone();
+            }
         }
         let body = match body_limited(response).await {
             Ok(b) => b,
@@ -242,6 +246,11 @@ async fn resolve_inner(
             }
         }
         if depth < 2 {
+            pending.extend(
+                text::page_continuations(&body, &final_url)
+                    .into_iter()
+                    .map(|v| (v, depth + 1, true)),
+            );
             // HTML 对象不跨越 await（scraper DOM 不是 Send）。
             let refs = {
                 let dom = Html::parse_document(&body);
@@ -261,10 +270,10 @@ async fn resolve_inner(
                     .take(8)
                     .collect::<Vec<_>>()
             };
-            pending.extend(refs.into_iter().map(|v| (v, depth + 1)));
+            pending.extend(refs.into_iter().map(|v| (v, depth + 1, false)));
         }
     }
-    match browser::capture(config, raw, input).await {
+    match browser::capture(config, &browser_page, input).await {
         Ok(found) => {
             for (u, h) in found {
                 match validate(&client, u, h).await {

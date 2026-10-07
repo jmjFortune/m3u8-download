@@ -3,6 +3,48 @@ use regex::Regex;
 use std::collections::{HashSet, VecDeque};
 use url::Url;
 
+/// Follow only an explicitly advertised gotoPath destination carrying the old page path.
+/// No JavaScript is executed, and comments or unrelated links are not navigation targets.
+pub fn page_continuations(text: &str, base: &Url) -> Vec<Url> {
+    let Some((_, path)) = base.query_pairs().find(|(key, _)| key == "path") else {
+        return Vec::new();
+    };
+    if !text.contains("gotoPath")
+        || !path.starts_with('/')
+        || path.starts_with("//")
+        || path.contains('\\')
+        || path.len() > 4096
+    {
+        return Vec::new();
+    }
+    let dom = scraper::Html::parse_document(text);
+    let selector = scraper::Selector::parse("[onclick]").unwrap();
+    let call = Regex::new(r#"^\s*gotoPath\(\s*['"](https?://[^'"\s]+)['"]\s*\)\s*;?\s*$"#).unwrap();
+    let mut seen = HashSet::new();
+    dom.select(&selector)
+        .filter_map(|element| {
+            let captures = call.captures(element.value().attr("onclick")?)?;
+            let target = Url::parse(&captures[1]).ok()?;
+            if !matches!(target.scheme(), "http" | "https")
+                || !target.username().is_empty()
+                || target.password().is_some()
+                || target.query().is_some()
+                || target.fragment().is_some()
+            {
+                return None;
+            }
+            let next = Url::parse(&format!(
+                "{}{}",
+                target.as_str().trim_end_matches('/'),
+                path
+            ))
+            .ok()?;
+            seen.insert(next.to_string()).then_some(next)
+        })
+        .take(4)
+        .collect()
+}
+
 /// 解码只作用于静态文本，不执行页面中的 JavaScript。
 pub fn extract(text: &str, base: &Url) -> Vec<Url> {
     let absolute = Regex::new(r#"(?i)https?://[^\s"'<>\\]+?\.(?:m3u8|mpd)[^\s"'<>\\]*"#).unwrap();
@@ -95,5 +137,78 @@ mod tests {
             extract(r#"atob("aHR0cHM6Ly9jZG4udGVzdC9hLm0zdTg=")"#, &b)[0].as_str(),
             "https://cdn.test/a.m3u8"
         );
+    }
+
+    #[tokio::test]
+    async fn resolve_page_that_moved_through_a_publisher() {
+        use axum::{
+            Router,
+            response::{Html, Redirect},
+            routing::get,
+        };
+        use clap::Parser;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let publisher = format!(r#"<button onclick="gotoPath('{origin}/moved');">Enter</button>"#);
+        let app = Router::new()
+            .route(
+                "/old/play/demo",
+                get(|| async {
+                    Redirect::temporary("/published?path=%2Fplay%2Fdemo%3Fsig%3Da%252Fb")
+                }),
+            )
+            .route(
+                "/published",
+                get(move || {
+                    let p = publisher.clone();
+                    async { Html(p) }
+                }),
+            )
+            .route(
+                "/moved/play/demo",
+                get(|| async {
+                    "#EXTM3U\n#EXT-X-TARGETDURATION:2\n#EXTINF:2,\nvideo.ts\n#EXT-X-ENDLIST\n"
+                }),
+            );
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let config =
+            crate::config::Config::parse_from(["pagecatch", "--browser", "/no-browser-needed"]);
+        let result = crate::resolver::resolve(
+            &config,
+            &format!("{origin}/old/play/demo"),
+            &Default::default(),
+        )
+        .await;
+        server.abort();
+        let resolved = result.expect("Published migration should resolve without a browser");
+        assert_eq!(
+            resolved.url.as_str(),
+            format!("{origin}/moved/play/demo?sig=a%2Fb")
+        );
+        assert_eq!(resolved.duration, Some(2.0));
+        assert_eq!(
+            resolved.headers["referer"],
+            format!("{origin}/moved/play/demo?sig=a%2Fb")
+        );
+    }
+
+    #[test]
+    fn publisher_navigation_preserves_signed_path_and_ignores_unrelated_targets() {
+        let base = Url::parse("https://publisher.test/?path=%2Fplay%2Fid%3Fsig%3Da%252Fb").unwrap();
+        let body = r#"<!-- <button onclick="gotoPath('https://comment.test')"> -->
+            <div onclick="gotoPath('https://new.test:8888');"></div>
+            <div onclick="gotoPath('https://new.test:8888');"></div>
+            <a href="https://ads.test">Ad</a>
+            <div onclick="gotoPath('https://user:pass@credentials.test')"></div>"#;
+        let urls = page_continuations(body, &base);
+        assert_eq!(urls.len(), 1);
+        assert_eq!(urls[0].as_str(), "https://new.test:8888/play/id?sig=a%2Fb");
+        for invalid in [
+            "https://publisher.test/?path=%2F%2Fother.test",
+            "https://publisher.test/?path=%2F%5Cother.test",
+            "https://publisher.test/play/id",
+        ] {
+            assert!(page_continuations(body, &Url::parse(invalid).unwrap()).is_empty());
+        }
     }
 }
