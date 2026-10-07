@@ -9,6 +9,7 @@ import collections
 import hashlib
 import http.server
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -25,9 +26,11 @@ def main():
     parser.add_argument('image')
     parser.add_argument('--expect-old-failure', action='store_true')
     args = parser.parse_args()
+    # Bind-mounted fixtures must remain writable/removable by the Linux CI user.
+    user = ['--user', f'{os.getuid()}:{os.getgid()}'] if hasattr(os, 'getuid') else []
     with tempfile.TemporaryDirectory(prefix='pagecatch-engine-test-') as tmp:
         folder = Path(tmp)
-        run(['docker', 'run', '--rm', '--entrypoint', 'ffmpeg',
+        run(['docker', 'run', '--rm', *user, '--entrypoint', 'ffmpeg',
              '-v', f'{folder}:/fixture', args.image,
              '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x90:rate=10',
              '-f', 'lavfi', '-i', 'sine=frequency=500', '-t', '8',
@@ -123,7 +126,7 @@ def main():
                 output = folder / case
                 output.mkdir()
                 url = f'http://host.docker.internal:{server.server_port}/{case}/playlist.m3u8'
-                command = ['docker', 'run', '--rm', '-t', '-e', 'TERM=xterm',
+                command = ['docker', 'run', '--rm', *user, '-t', '-e', 'TERM=xterm',
                            '--add-host', 'host.docker.internal:host-gateway',
                            '--entrypoint', 'N_m3u8DL-RE', '-v', f'{output}:/check',
                            args.image, url, '--save-dir', '/check', '--tmp-dir', '/check',
@@ -156,7 +159,7 @@ def main():
                         bad_index = 0 if case == 'html_first_once' else 1
                         expected_count = 2 if index == bad_index and case != 'clean' else 1
                         assert requests[f'segment{index}.ts'] == expected_count, requests
-                    run(['docker', 'run', '--rm', '--entrypoint', 'ffmpeg',
+                    run(['docker', 'run', '--rm', *user, '--entrypoint', 'ffmpeg',
                          '-v', f'{output}:/check:ro', args.image, '-v', 'error',
                          '-threads', '1', '-err_detect', 'explode', '-xerror',
                          '-i', '/check/video.mp4', '-f', 'null', '-'])
